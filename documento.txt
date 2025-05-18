@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Recomendación Musical</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/3.21.0/tf.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4a4a4a;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        .instructions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .band-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .band-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .band-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #333;
+        }
+        
+        .rating-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .rating-slider {
+            width: 200px;
+            height: 8px;
+            border-radius: 4px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .rating-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+        
+        .rating-value {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.2em;
+            min-width: 30px;
+            text-align: center;
+        }
+        
+        .process-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 25px;
+            cursor: pointer;
+            display: block;
+            margin: 30px auto;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .process-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+        
+        .process-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .results {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 30px;
+            border: 2px solid #667eea;
+            display: none;
+        }
+        
+        .results h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .genre-item {
+            background: white;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .genre-name {
+            font-weight: bold;
+        }
+        
+        .genre-score {
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-size: 1.1em;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Sistema de Recomendación Musical 🎵</h1>
+        
+        <div class="instructions">
+            <h3>📋 Instrucciones:</h3>
+            <p>Califica cada grupo musical del 1 al 10 según tus preferencias. Después haz clic en "Procesar Información" para descubrir tu ranking de gustos musicales.</p>
+        </div>
+        
+        <div id="bandsContainer"></div>
+        
+        <button class="process-btn" onclick="processRatings()">
+            🎸 Procesar Información
+        </button>
+        
+        <div class="loading" id="loading">
+            Procesando tus gustos musicales...
+        </div>
+        
+        <div class="results" id="results">
+            <h2>🎯 Tu Ranking Musical</h2>
+            <div id="genreRanking"></div>
+        </div>
+    </div>
+
+    <script>
+        // Datos del sistema
+        const bands = ['Nirvana', 'Nine Inch Nails', 'Stone Temple Pilots', 'Alice in Chains', 'Marilyn Manson', 'Tool', 'Pearl Jam'];
+        const genres = ['Grunge', 'Rock', 'Industrial', 'Alternative', 'Metal', 'Progressive'];
+        
+        // Matriz de características: cada banda pertenece a ciertos géneros (1 = sí, 0 = no)
+        const bandFeatures = [
+            [1, 1, 0, 1, 0, 0], // Nirvana: Grunge, Rock, Alternative
+            [0, 0, 1, 1, 1, 0], // Nine Inch Nails: Industrial, Alternative, Metal
+            [1, 1, 0, 1, 0, 0], // Stone Temple Pilots: Grunge, Rock, Alternative
+            [1, 1, 0, 1, 1, 0], // Alice in Chains: Grunge, Rock, Alternative, Metal
+            [0, 0, 1, 1, 1, 0], // Marilyn Manson: Industrial, Alternative, Metal
+            [0, 1, 0, 1, 1, 1], // Tool: Rock, Alternative, Metal, Progressive
+            [1, 1, 0, 1, 0, 0]  // Pearl Jam: Grunge, Rock, Alternative
+        ];
+        
+        let userRatings = new Array(bands.length).fill(5);
+        
+        // Crear interfaz de calificación
+        function createBandInterface() {
+            const container = document.getElementById('bandsContainer');
+            
+            bands.forEach((band, index) => {
+                const bandDiv = document.createElement('div');
+                bandDiv.className = 'band-item';
+                
+                bandDiv.innerHTML = `
+                    <div class="band-name">${band}</div>
+                    <div class="rating-container">
+                        <span>1</span>
+                        <input type="range" 
+                               class="rating-slider" 
+                               id="rating-${index}"
+                               min="1" 
+                               max="10" 
+                               value="5"
+                               oninput="updateRating(${index}, this.value)">
+                        <span>10</span>
+                        <div class="rating-value" id="value-${index}">5</div>
+                    </div>
+                `;
+                
+                container.appendChild(bandDiv);
+            });
+        }
+        
+        // Actualizar calificación
+        function updateRating(bandIndex, value) {
+            userRatings[bandIndex] = parseInt(value);
+            document.getElementById(`value-${bandIndex}`).textContent = value;
+        }
+        
+        // Procesar calificaciones con TensorFlow.js
+        async function processRatings() {
+            const loadingEl = document.getElementById('loading');
+            const resultsEl = document.getElementById('results');
+            const processBtn = document.querySelector('.process-btn');
+            
+            // Mostrar loading
+            loadingEl.style.display = 'block';
+            resultsEl.style.display = 'none';
+            processBtn.disabled = true;
+            
+            try {
+                // Crear tensores
+                const userVotesTensor = tf.tensor2d([userRatings]);
+                const bandFeaturesTensor = tf.tensor2d(bandFeatures);
+                
+                // Multiplicación matricial: user_votes × band_features
+                const userGenrePreferences = tf.matMul(userVotesTensor, bandFeaturesTensor);
+                
+                // Obtener los valores como array
+                const preferences = await userGenrePreferences.data();
+                
+                // Crear array de géneros con sus puntajes
+                const genreScores = genres.map((genre, index) => ({
+                    name: genre,
+                    score: preferences[index]
+                }));
+                
+                // Ordenar por puntaje descendente
+                genreScores.sort((a, b) => b.score - a.score);
+                
+                // Mostrar resultados
+                displayResults(genreScores);
+                
+                // Limpiar tensores
+                userVotesTensor.dispose();
+                bandFeaturesTensor.dispose();
+                userGenrePreferences.dispose();
+                
+            } catch (error) {
+                console.error('Error procesando las calificaciones:', error);
+                alert('Hubo un error procesando tus calificaciones. Por favor, intenta de nuevo.');
+            } finally {
+                loadingEl.style.display = 'none';
+                processBtn.disabled = false;
+            }
+        }
+        
+        // Mostrar resultados
+        function displayResults(genreScores) {
+            const rankingContainer = document.getElementById('genreRanking');
+            const resultsEl = document.getElementById('results');
+            
+            rankingContainer.innerHTML = '';
+            
+            genreScores.forEach((genre, index) => {
+                const genreDiv = document.createElement('div');
+                genreDiv.className = 'genre-item';
+                
+                const emoji = ['🥇', '🥈', '🥉', '🏆', '🎵', '🎶'][index] || '🎵';
+                
+                genreDiv.innerHTML = `
+                    <div class="genre-name">
+                        ${emoji} ${index + 1}. ${genre.name}
+                    </div>
+                    <div class="genre-score">
+                        ${genre.score.toFixed(1)} pts
+                    </div>
+                `;
+                
+                rankingContainer.appendChild(genreDiv);
+            });
+            
+            resultsEl.style.display = 'block';
+            resultsEl.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Inicializar la aplicación
+        window.onload = function() {
+            createBandInterface();
+            console.log('Sistema de recomendación musical cargado exitosamente');
+        };
+    </script>
+</body>
+</html>

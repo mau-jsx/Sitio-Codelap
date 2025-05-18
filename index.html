@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sitio de Musica</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/3.21.0/tf.min.js"></script>
+    <style>
+      body {
+        font-family: "Arial", sans-serif;
+        background: linear-gradient(
+          135deg,
+          hsl(40, 86%, 54%) 0%,
+          hsl(8, 79%, 48%) 100%
+        );
+        background-attachment: fixed;
+        margin: 0;
+        padding: 20px;
+        min-height: 100vh;
+        color: #333;
+        position: relative;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: radial-gradient(
+            circle at 25% 25%,
+            rgba(255, 255, 255, 0.1) 0%,
+            transparent 50%
+          )
+          radial-gradient(
+            circle at 75% 75%,
+            rgba(255, 255, 255, 0.1) 0%,
+            transparent 50%
+          );
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border-radius: 20px;
+        border: 1px rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        padding: 30px;
+      }
+
+      h1 {
+        text-align: center;
+        color: #fff;
+        margin-bottom: 30px;
+        font-size: 2.5rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .instructions {
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+      }
+
+      .band-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+        color: white;
+      }
+
+      .instructions h3 {
+        color: white;
+        margin-bottom: 15px;
+      }
+
+      .band-item:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+
+      .band-name {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      .rating-container {
+        display: flex;
+        align-items: center;
+        gap: 100px;
+      }
+
+      .rating-container span {
+        color: rgba(255, 255, 255, 0.8);
+        font-weight: 500;
+      }
+
+      .rating-slider {
+        width: 200px;
+        height: 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.3);
+        outline: none;
+        -webkit-appearance: none;
+      }
+
+      .rating-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #74b9ff, #0984e3);
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .rating-value {
+        font-weight: bold;
+        color: white;
+        font-size: 1.2em;
+        min-width: 30px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 5px 10px;
+        border-radius: 10px;
+      }
+
+      .process-btn {
+        background: linear-gradient(
+          135deg,
+          rgba(116, 185, 255, 0.3),
+          rgba(9, 132, 227, 0.3)
+        );
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 15px 30px;
+        font-size: 1.2em;
+        border-radius: 25px;
+        cursor: pointer;
+        display: block;
+        margin: 30px auto;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        font-weight: 600;
+      }
+
+      .process-btn:hover {
+        background: linear-gradient(
+          135deg,
+          rgba(116, 185, 255, 0.4),
+          rgba(9, 132, 227, 0.4)
+        );
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        border-color: rgba(255, 255, 255, 0.4);
+      }
+
+      .process-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .results {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: 25px;
+        border-radius: 15px;
+        margin-top: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        display: none;
+      }
+
+      .results h2 {
+        color: white;
+        margin-bottom: 20px;
+        text-align: center;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      .genre-item {
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        padding: 12px;
+        margin: 8px 0;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .genre-name {
+        font-weight: bold;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      .genre-score {
+        background: linear-gradient(135deg, #74b9ff, #0984e3);
+        color: white;
+        padding: 5px 12px;
+        border-radius: 15px;
+        font-weight: bold;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .loading {
+        text-align: center;
+        color: white;
+        font-size: 1.1em;
+        display: none;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Sistema de Recomendacion Musical</h1>
+      <div class="instructions">
+        <h3>Instrucciones:</h3>
+        <p>
+          Califica cada banda segun tus preferencias del 1 al 10, Despues haz
+          click en "Mis Gustos Musicales" para descubrir tu ranking Musical
+        </p>
+      </div>
+      <div id="bandsContainer">
+        <!-- Aquí se mostrarán tu ranking -->
+      </div>
+      <button class="process-btn" onclick="processRatings()">
+        Mis Gustos Musicales
+      </button>
+
+      <div class="loading" id="loading">Procesando tus Gustos Musicales...</div>
+
+      <div class="results" id="results">
+        <h2>Tu ranking Musical</h2>
+        <div id="genreRanking"></div>
+      </div>
+    </div>
+    <script>
+      const bands = [
+        "Nirvana",
+        "Nine Inch Nails",
+        "Stone Temple Pilots",
+        "Alice in Chains",
+        "Marilyn Manson",
+        "Tool",
+        "Pearl Jam",
+      ];
+      const genres = [
+        "Grunge",
+        "Rock",
+        "Industrial",
+        "Alternative",
+        "Metal",
+        "Progressive",
+      ];
+
+      const bandFeatures = [
+        [1, 1, 0, 1, 0, 0],
+        [0, 0, 1, 1, 1, 0],
+        [1, 1, 0, 1, 0, 0],
+        [1, 1, 0, 1, 1, 0],
+        [0, 0, 1, 1, 1, 0],
+        [0, 1, 0, 1, 1, 1],
+        [1, 1, 0, 1, 0, 0],
+      ];
+
+      let userRatings = new Array(bands.length).fill(5);
+
+      function createBandInterface() {
+        const container = document.getElementById("bandsContainer");
+
+        bands.forEach((band, index) => {
+          const bandDiv = document.createElement("div");
+          bandDiv.className = "band-item";
+
+          bandDiv.innerHTML = `
+                    <div class="band-name">${band}</div>
+                    <div class="rating-container">
+                        <span>1</span>
+                        <input type="range" 
+                               class="rating-slider" 
+                               id="rating-${index}"
+                               min="1" 
+                               max="10" 
+                               value="5"
+                               oninput="updateRating(${index}, this.value)">
+                        <span>10</span>
+                        <div class="rating-value" id="value-${index}">5</div>
+                    </div>
+                `;
+
+          container.appendChild(bandDiv);
+        });
+      }
+
+      function updateRating(bandIndex, value) {
+        userRatings[bandIndex] = parseInt(value);
+        document.getElementById(`value-${bandIndex}`).textContent = value;
+      }
+
+      async function processRatings() {
+        const loadingEl = document.getElementById("loading");
+        const resultsEl = document.getElementById("results");
+        const processBtn = document.querySelector(".process-btn");
+
+        loadingEl.style.display = "block";
+        resultsEl.style.display = "none";
+        processBtn.disabled = true;
+        try {
+          const userVotesTensor = tf.tensor2d([userRatings]);
+          const bandFeaturesTensor = tf.tensor2d(bandFeatures);
+
+          const userGenrePreferences = tf.matMul(
+            userVotesTensor,
+            bandFeaturesTensor
+          );
+
+          const preferences = await userGenrePreferences.data();
+
+          const genreScores = genres.map((genre, index) => ({
+            name: genre,
+            score: preferences[index],
+          }));
+
+          genreScores.sort((a, b) => b.score - a.score);
+
+          displayResults(genreScores);
+
+          userVotesTensor.dispose();
+          bandFeaturesTensor.dispose();
+          userGenrePreferences.dispose();
+        } catch (error) {
+          console.error("Error procesando las calificaciones:", error);
+          alert(
+            "Hubo un error procesando tus calificaciones. Por favor, intenta de nuevo."
+          );
+        } finally {
+          loadingEl.style.display = "none";
+          processBtn.disabled = false;
+        }
+      }
+
+      function displayResults(genreScores) {
+        const rankingContainer = document.getElementById("genreRanking");
+        const resultsEl = document.getElementById("results");
+
+        rankingContainer.innerHTML = "";
+
+        genreScores.forEach((genre, index) => {
+          const genreDiv = document.createElement("div");
+          genreDiv.className = "genre-item";
+
+          const emoji = ["🥇", "🥈", "🥉", "🏆", "🎵", "🎶"][index] || "🎵";
+
+          genreDiv.innerHTML = `
+                    <div class="genre-name">
+                        ${emoji} ${index + 1}. ${genre.name}
+                    </div>
+                    <div class="genre-score">
+                        ${genre.score.toFixed(1)} pts
+                    </div>
+                `;
+
+          rankingContainer.appendChild(genreDiv);
+        });
+
+        resultsEl.style.display = "block";
+        resultsEl.scrollIntoView({ behavior: "smooth" });
+      }
+
+      window.onload = function () {
+        createBandInterface();
+        console.log("Sistema de recomendación musical cargado exitosamente");
+      };
+    </script>
+  </body>
+</html>
